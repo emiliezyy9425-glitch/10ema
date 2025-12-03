@@ -30,19 +30,21 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from live_trading import connect_ibkr
-from martingale_ibkr_backtester import CAPITAL, COMMISSION_PER_SHARE, TIMEFRAMES
 
-logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(message)s")
-
-# Override unsafe defaults from the backtester: cap martingale risk and set reset level
+# === HARD-CODED SAFE SETTINGS (no backtester needed) ===
+CAPITAL = 500_000
+COMMISSION_PER_SHARE = 0.0035
 MARTINGALE_CAP_PCT = 16.0
 RISK_RESET_PCT = 1.0
+LIVE_TIMEFRAMES = ["30 mins", "1 hour", "4 hours", "1 day"]
+
+logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(message)s")
 
 PROJECT_ROOT = Path("/app")
 DATA_DIR = PROJECT_ROOT / "data"
 STATE_PATH = DATA_DIR / "martingale_live_state.json"
 TRADE_LOG_PATH = DATA_DIR / "trade_log_live.csv"
-TICKERS_FILE = Path("tickers.txt")
+TICKERS_FILE = PROJECT_ROOT / "tickers.txt"
 
 # Match IBKR-compliant durations used in the backtester
 DURATION_MAP = {
@@ -59,7 +61,7 @@ DURATION_MAP = {
 
 # Restrict live trading to higher timeframes (exclude sub-30m intervals)
 EXCLUDED_TIMEFRAMES = {"1 min", "2 mins", "3 mins", "5 mins", "15 mins"}
-LIVE_TIMEFRAMES = [tf for tf in TIMEFRAMES if tf not in EXCLUDED_TIMEFRAMES]
+LIVE_TIMEFRAMES = [tf for tf in LIVE_TIMEFRAMES if tf not in EXCLUDED_TIMEFRAMES]
 
 
 # --------------------------- Persistence ---------------------------
