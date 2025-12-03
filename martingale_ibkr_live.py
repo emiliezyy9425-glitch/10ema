@@ -17,12 +17,17 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
 
 import pandas as pd
 from ib_insync import IB, MarketOrder, Stock, Trade, util
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from live_trading import connect_ibkr
 from martingale_ibkr_backtester import (
