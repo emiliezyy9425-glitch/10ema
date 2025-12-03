@@ -30,13 +30,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from live_trading import connect_ibkr
-from martingale_ibkr_backtester import (
-    CAPITAL,
-    COMMISSION_PER_SHARE,
-    MARTINGALE_CAP_PCT,
-    RISK_RESET_PCT,
-    TIMEFRAMES,
-)
+from martingale_ibkr_backtester import CAPITAL, COMMISSION_PER_SHARE, TIMEFRAMES
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(message)s")
 
