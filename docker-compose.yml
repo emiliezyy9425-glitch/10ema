@@ -1,0 +1,13 @@
+version: "3.9"
+
+services:
+  martingale:
+    build: .
+    container_name: martingale-live
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data          # ← persists state + logs across restarts
+      - ./tickers.txt:/app/tickers.txt:ro
+    network_mode: host            # ← REQUIRED for IBKR TWS/Gateway
+    environment:
+      - TZ=America/New_York
