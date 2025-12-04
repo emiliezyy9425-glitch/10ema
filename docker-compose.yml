@@ -6,8 +6,10 @@ services:
     container_name: martingale-live
     restart: unless-stopped
     volumes:
-      - ./data:/app/data          # ← persists state + logs across restarts
+      - ./data:/app/data
       - ./tickers.txt:/app/tickers.txt:ro
-    network_mode: host            # ← REQUIRED for IBKR TWS/Gateway
-    environment:
-      - TZ=America/New_York
+    ports:
+      - "7496:7496"    # ← LIVE port forwarding
+      - "7497:7497"    # ← PAPER (optional)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # ← THIS IS THE MAGIC LINE FOR WINDOWS
