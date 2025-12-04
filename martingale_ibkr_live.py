@@ -1,6 +1,6 @@
 """Live IBKR martingale trader derived from ``martingale_ibkr_backtester``.
 
-This script mirrors the backtester's signal logic (10-day EMA cross) and
+This script mirrors the backtester's signal logic (21-day VWMA cross) and
 applies a simple martingale position-sizing scheme:
 
 * Start at ``RISK_RESET_PCT`` of available equity per trade
@@ -126,13 +126,13 @@ def fetch_intraday(ib: IB, contract: Stock, timeframe: str) -> pd.DataFrame:
     return df.set_index("date")
 
 
-def get_daily_ema10(ib: IB, contract: Stock) -> pd.Series:
+def get_daily_vwma21(ib: IB, contract: Stock) -> pd.Series:
     bars = ib.reqHistoricalData(
         contract,
         endDateTime="",
         durationStr="3 Y",
         barSizeSetting="1 day",
-        whatToShow="MIDPOINT",
+        whatToShow="TRADES",
         useRTH=True,
         formatDate=1,
     )
@@ -144,8 +144,10 @@ def get_daily_ema10(ib: IB, contract: Stock) -> pd.Series:
     df["date"] = (
         df_dates.dt.tz_localize("UTC") if df_dates.dt.tz is None else df_dates.dt.tz_convert("UTC")
     )
-    ema10 = df["close"].ewm(span=10, adjust=False).mean()
-    return ema10.set_index(df["date"])
+    pv = df["close"] * df["volume"]
+    volume_sum = df["volume"].rolling(window=21, min_periods=21).sum()
+    vwma21 = pv.rolling(window=21, min_periods=21).sum() / volume_sum
+    return vwma21.set_index(df["date"])
 
 
 def timeframe_to_timedelta(timeframe: str) -> pd.Timedelta:
@@ -165,14 +167,14 @@ def timeframe_to_timedelta(timeframe: str) -> pd.Timedelta:
 
 # --------------------------- Trading logic ---------------------------
 def compute_signals(df: pd.DataFrame) -> pd.DataFrame:
-    if df.empty or "ema10" not in df:
+    if df.empty or "vwma21" not in df:
         return df
 
     df = df.copy()
     df["prev_close"] = df["close"].shift(1)
-    df["prev_ema"] = df["ema10"].shift(1)
-    df["buy_signal"] = (df["prev_close"] < df["prev_ema"]) & (df["close"] > df["ema10"])
-    df["sell_signal"] = (df["prev_close"] > df["prev_ema"]) & (df["close"] < df["ema10"])
+    df["prev_vwma"] = df["vwma21"].shift(1)
+    df["buy_signal"] = (df["prev_close"] < df["prev_vwma"]) & (df["close"] > df["vwma21"])
+    df["sell_signal"] = (df["prev_close"] > df["prev_vwma"]) & (df["close"] < df["vwma21"])
     return df
 
 
@@ -202,14 +204,14 @@ def execute_strategy_for_symbol(ib: IB, symbol: str, timeframe: str, state: Dict
         logging.warning("No intraday data for %s (%s)", symbol, timeframe)
         return
 
-    daily_ema = get_daily_ema10(ib, contract)
-    if daily_ema.empty:
+    daily_vwma = get_daily_vwma21(ib, contract)
+    if daily_vwma.empty:
         logging.warning("No daily data for %s (%s)", symbol, timeframe)
         return
 
     df = intraday.copy()
-    df["ema10"] = (
-        daily_ema.resample("1min").ffill().bfill().reindex(df.index, method="nearest")
+    df["vwma21"] = (
+        daily_vwma.resample("1min").ffill().bfill().reindex(df.index, method="nearest")
     )
     df = compute_signals(df)
     latest = df.iloc[-1]
