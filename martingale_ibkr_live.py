@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 import pandas as pd
+from pandas import Timestamp
 from ib_insync import IB, MarketOrder, Stock, Trade, util
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -213,6 +214,7 @@ def execute_strategy_for_symbol(ib: IB, symbol: str, timeframe: str, state: Dict
     )
     df = compute_signals(df)
     latest = df.iloc[-1]
+    latest_bar_start = latest.name.floor(timeframe_to_timedelta(timeframe))
 
     # Open/close logic mirrors the backtester: exit on opposite signal, then consider new entries
     position = state[key].get("position", 0)
@@ -220,13 +222,15 @@ def execute_strategy_for_symbol(ib: IB, symbol: str, timeframe: str, state: Dict
     shares = state[key].get("shares", 0)
     risk_pct = float(state[key].get("risk_pct", RISK_RESET_PCT))
 
-    equity = get_equity(ib)
-
     def update_risk(win: bool) -> float:
         return RISK_RESET_PCT if win else min(risk_pct * 2, MARTINGALE_CAP_PCT)
 
     if position != 0 and ((position == 1 and latest.sell_signal) or (position == -1 and latest.buy_signal)):
-        exit_price = float(latest["open"])
+        equity = get_equity(ib)
+        ticker = ib.reqTickers(contract)[0]
+        exit_price = ticker.marketPrice()
+        if exit_price is None or pd.isna(exit_price):
+            exit_price = float(latest["close"])
         action = "SELL" if position == 1 else "BUY"
         trade = place_market_order(ib, contract, action, abs(shares))
         ib.sleep(1)
@@ -271,9 +275,15 @@ def execute_strategy_for_symbol(ib: IB, symbol: str, timeframe: str, state: Dict
     # If flat, consider new entry on the latest completed bar
     position = state[key].get("position", 0)
     risk_pct = float(state[key].get("risk_pct", RISK_RESET_PCT))
-    current_bar_time = latest.name.floor(timeframe_to_timedelta(timeframe))
     last_entry_time = state[key].get("last_entry_bar")
-    if position == 0 and (last_entry_time != str(current_bar_time)):
+    symbol_positions = [
+        v.get("position", 0)
+        for k, v in state.items()
+        if k.startswith(f"{symbol}:") and k != key
+    ]
+    if position == 0 and not any(symbol_positions):
+        if last_entry_time is not None and Timestamp(last_entry_time) >= latest_bar_start:
+            return
         if latest.buy_signal:
             action = "BUY"
             position = 1
@@ -283,7 +293,11 @@ def execute_strategy_for_symbol(ib: IB, symbol: str, timeframe: str, state: Dict
         else:
             return
 
-        price = float(latest["open"])
+        equity = get_equity(ib)
+        ticker = ib.reqTickers(contract)[0]
+        price = ticker.marketPrice()
+        if price is None or pd.isna(price):
+            price = float(latest["close"])
         shares = max(int(round(equity * (risk_pct / 100) / price)), 1)
         trade = place_market_order(ib, contract, action, shares)
         ib.sleep(1)
@@ -294,7 +308,7 @@ def execute_strategy_for_symbol(ib: IB, symbol: str, timeframe: str, state: Dict
             "position": position,
             "entry_price": actual_entry,
             "shares": shares,
-            "last_entry_bar": str(current_bar_time),
+            "last_entry_bar": latest_bar_start.isoformat(),
         }
 
         log_trade(
