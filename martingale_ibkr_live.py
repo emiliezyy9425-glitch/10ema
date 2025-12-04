@@ -112,7 +112,7 @@ def fetch_intraday(ib: IB, contract: Stock, timeframe: str) -> pd.DataFrame:
         endDateTime=end_dt,
         durationStr=DURATION_MAP.get(timeframe, "90 D"),
         barSizeSetting=timeframe,
-        whatToShow="TRADES",
+        whatToShow="MIDPOINT",
         useRTH=True,
         formatDate=1,
     )
@@ -126,28 +126,26 @@ def fetch_intraday(ib: IB, contract: Stock, timeframe: str) -> pd.DataFrame:
     return df.set_index("date")
 
 
-def fetch_daily_ema(ib: IB, contract: Stock) -> pd.Series:
-    bars_daily = ib.reqHistoricalData(
+def get_daily_ema10(ib: IB, contract: Stock) -> pd.Series:
+    bars = ib.reqHistoricalData(
         contract,
-        endDateTime=datetime.now(),
+        endDateTime="",
         durationStr="3 Y",
         barSizeSetting="1 day",
         whatToShow="MIDPOINT",
         useRTH=True,
         formatDate=1,
     )
-    daily_df = util.df(bars_daily)
-    if daily_df.empty:
+    df = util.df(bars)
+    if df.empty:
         return pd.Series(dtype=float)
 
-    daily_dates = pd.to_datetime(daily_df["date"])
-    daily_df["date"] = (
-        daily_dates.dt.tz_localize("UTC")
-        if daily_dates.dt.tz is None
-        else daily_dates.dt.tz_convert("UTC")
+    df_dates = pd.to_datetime(df["date"])
+    df["date"] = (
+        df_dates.dt.tz_localize("UTC") if df_dates.dt.tz is None else df_dates.dt.tz_convert("UTC")
     )
-    daily_df = daily_df.set_index("date")
-    return daily_df["close"].ewm(span=10, adjust=False).mean()
+    ema10 = df["close"].ewm(span=10, adjust=False).mean()
+    return ema10.set_index(df["date"])
 
 
 def timeframe_to_timedelta(timeframe: str) -> pd.Timedelta:
@@ -166,13 +164,11 @@ def timeframe_to_timedelta(timeframe: str) -> pd.Timedelta:
 
 
 # --------------------------- Trading logic ---------------------------
-def compute_signals(df: pd.DataFrame, ema10: pd.Series) -> pd.DataFrame:
-    if df.empty:
+def compute_signals(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty or "ema10" not in df:
         return df
 
-    ema_resampled = ema10.resample("1min").ffill().reindex(df.index, method="nearest")
     df = df.copy()
-    df["ema10"] = ema_resampled
     df["prev_close"] = df["close"].shift(1)
     df["prev_ema"] = df["ema10"].shift(1)
     df["buy_signal"] = (df["prev_close"] < df["prev_ema"]) & (df["close"] > df["ema10"])
@@ -206,12 +202,16 @@ def execute_strategy_for_symbol(ib: IB, symbol: str, timeframe: str, state: Dict
         logging.warning("No intraday data for %s (%s)", symbol, timeframe)
         return
 
-    ema10 = fetch_daily_ema(ib, contract)
-    if ema10.empty:
+    daily_ema = get_daily_ema10(ib, contract)
+    if daily_ema.empty:
         logging.warning("No daily data for %s (%s)", symbol, timeframe)
         return
 
-    df = compute_signals(intraday, ema10)
+    df = intraday.copy()
+    df["ema10"] = (
+        daily_ema.resample("1min").ffill().bfill().reindex(df.index, method="nearest")
+    )
+    df = compute_signals(df)
     latest = df.iloc[-1]
 
     # Open/close logic mirrors the backtester: exit on opposite signal, then consider new entries
