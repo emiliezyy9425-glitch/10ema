@@ -209,12 +209,24 @@ def execute_strategy_for_symbol(ib: IB, symbol: str, timeframe: str, state: Dict
         return
 
     df = intraday.copy()
-    df["ema10"] = (
-        daily_ema.resample("1min").ffill().bfill().reindex(df.index, method="nearest")
-    )
+
+    # Use only the most recent completed daily EMA value to avoid look-ahead bias
+    last_daily_close = daily_ema.index[-1].normalize()
+    now = datetime.now(tz=daily_ema.index[-1].tzinfo)
+    if now.date() > last_daily_close.date():
+        current_ema10 = daily_ema.iloc[-1]
+    else:
+        current_ema10 = daily_ema.iloc[-2]
+
+    df["ema10"] = current_ema10
     df = compute_signals(df)
     latest = df.iloc[-1]
     latest_bar_start = latest.name.floor(timeframe_to_timedelta(timeframe))
+
+    # Only act on fully closed bars
+    bar_end = latest.name + timeframe_to_timedelta(timeframe)
+    if datetime.now(tz=latest.name.tzinfo) < bar_end:
+        return
 
     # Open/close logic mirrors the backtester: exit on opposite signal, then consider new entries
     position = state[key].get("position", 0)
@@ -262,6 +274,7 @@ def execute_strategy_for_symbol(ib: IB, symbol: str, timeframe: str, state: Dict
             "risk_pct": risk_pct,
             "position": 0,
             "last_entry_bar": state[key].get("last_entry_bar"),
+            "last_exit_bar": latest_bar_start.isoformat(),
         }
         logging.info(
             "Exited %s %s | PnL: %.2f | Exit fill: %.4f | Risk now %.1f%%",
@@ -276,12 +289,15 @@ def execute_strategy_for_symbol(ib: IB, symbol: str, timeframe: str, state: Dict
     position = state[key].get("position", 0)
     risk_pct = float(state[key].get("risk_pct", RISK_RESET_PCT))
     last_entry_time = state[key].get("last_entry_bar")
+    last_exit_bar = state[key].get("last_exit_bar")
     symbol_positions = [
         v.get("position", 0)
         for k, v in state.items()
         if k.startswith(f"{symbol}:") and k != key
     ]
     if position == 0 and not any(symbol_positions):
+        if last_exit_bar and Timestamp(last_exit_bar) >= latest_bar_start:
+            return
         if last_entry_time is not None and Timestamp(last_entry_time) >= latest_bar_start:
             return
         if latest.buy_signal:
