@@ -37,7 +37,7 @@ CAPITAL = 500_000
 COMMISSION_PER_SHARE = 0.0035
 MARTINGALE_CAP_PCT = 16.0
 RISK_RESET_PCT = 1.0
-LIVE_TIMEFRAMES = ["30 mins", "1 hour", "4 hours", "1 day"]
+LIVE_TIMEFRAMES = ["30 mins", "1 hour", "4 hours"]
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(message)s")
 
@@ -61,7 +61,7 @@ DURATION_MAP = {
 }
 
 # Restrict live trading to higher timeframes (exclude sub-30m intervals)
-EXCLUDED_TIMEFRAMES = {"1 min", "2 mins", "3 mins", "5 mins", "15 mins"}
+EXCLUDED_TIMEFRAMES = {"1 min", "2 mins", "3 mins", "5 mins", "15 mins", "1 day"}
 LIVE_TIMEFRAMES = [tf for tf in LIVE_TIMEFRAMES if tf not in EXCLUDED_TIMEFRAMES]
 
 
