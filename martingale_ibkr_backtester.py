@@ -169,10 +169,15 @@ async def run_backtest(symbol: str, timeframe: str) -> pd.DataFrame:
             pv = daily_df["close"] * daily_df["volume"]
             volume_sum = daily_df["volume"].rolling(window=21, min_periods=21).sum()
             daily_df["vwma21"] = pv.rolling(window=21, min_periods=21).sum() / volume_sum
-            daily_vwma = daily_df["vwma21"]
 
-            vwma_resampled = daily_vwma.resample("1min").ffill().reindex(df.index, method="nearest")
-            df["vwma21"] = vwma_resampled
+            # Use only the most recent completed daily VWMA value (no future leak)
+            latest_daily_date = daily_df.index[-1].normalize()
+            if pd.Timestamp.now(tz="UTC").date() > latest_daily_date.date():
+                current_indicator = daily_df["vwma21"].iloc[-1]
+            else:
+                current_indicator = daily_df["vwma21"].iloc[-2]
+
+            df["vwma21"] = current_indicator
 
         finally:
             ib_daily.disconnect()
