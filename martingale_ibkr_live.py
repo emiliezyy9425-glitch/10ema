@@ -219,7 +219,7 @@ def execute_strategy_for_symbol(ib: IB, symbol: str, timeframe: str, state: Dict
         current_ema10 = daily_ema.iloc[-2]
 
     df["ema10"] = current_ema10
-    df["prev_ema10"] = current_ema10
+    df["prev_ema"] = current_ema10
     df = compute_signals(df)
     latest = df.iloc[-1]
     latest_bar_start = latest.name.floor(timeframe_to_timedelta(timeframe))
