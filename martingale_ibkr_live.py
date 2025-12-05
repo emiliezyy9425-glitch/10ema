@@ -133,7 +133,7 @@ def get_daily_vwma21(ib: IB, contract: Stock) -> pd.Series:
         endDateTime="",
         durationStr="3 Y",
         barSizeSetting="1 day",
-        whatToShow="TRADES",
+        whatToShow="MIDPOINT",
         useRTH=True,
         formatDate=1,
     )
@@ -263,7 +263,7 @@ def execute_strategy_for_symbol(ib: IB, symbol: str, timeframe: str, state: Dict
         state[key] = {
             "risk_pct": risk_pct,
             "position": 0,
-            "last_entry_bar": state[key].get("last_entry_bar"),
+            "last_entry_bar": None,
         }
         logging.info(
             "Exited %s %s | PnL: %.2f | Exit fill: %.4f | Risk now %.1f%%",
