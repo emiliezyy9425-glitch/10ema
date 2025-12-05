@@ -81,7 +81,7 @@ def get_daily_vwma21(ib: IB, contract: Stock, end_date: datetime) -> pd.DataFram
         endDateTime=end_date,
         durationStr="3 Y",   # ← Must match 1-day duration
         barSizeSetting="1 day",
-        whatToShow="TRADES",
+        whatToShow="MIDPOINT",
         useRTH=True,
         formatDate=1,
     )
@@ -126,7 +126,7 @@ async def run_backtest(symbol: str, timeframe: str) -> pd.DataFrame:
         endDateTime=end_dt,
         durationStr=durationStr,
         barSizeSetting=timeframe,
-        whatToShow="TRADES",
+        whatToShow="MIDPOINT",
         useRTH=True,
         formatDate=1,
     )
@@ -154,7 +154,7 @@ async def run_backtest(symbol: str, timeframe: str) -> pd.DataFrame:
                 endDateTime=end_dt,
                 durationStr="3 Y",   # ← Must match 1-day duration
                 barSizeSetting="1 day",
-                whatToShow="TRADES",
+                whatToShow="MIDPOINT",
                 useRTH=True,
                 formatDate=1,
             )
