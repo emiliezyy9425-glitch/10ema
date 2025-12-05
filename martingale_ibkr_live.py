@@ -145,8 +145,9 @@ def get_daily_ema10(ib: IB, contract: Stock) -> pd.Series:
     df["date"] = (
         df_dates.dt.tz_localize("UTC") if df_dates.dt.tz is None else df_dates.dt.tz_convert("UTC")
     )
+    df = df.set_index("date")
     ema10 = df["close"].ewm(span=10, adjust=False).mean()
-    return ema10.set_index(df["date"])
+    return ema10
 
 
 def timeframe_to_timedelta(timeframe: str) -> pd.Timedelta:
