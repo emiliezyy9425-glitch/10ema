@@ -211,14 +211,14 @@ def execute_strategy_for_symbol(ib: IB, symbol: str, timeframe: str, state: Dict
     df = intraday.copy()
 
     # Use only the most recent completed daily EMA value to avoid look-ahead bias
-    last_daily_close = daily_ema.index[-1].normalize()
-    now = datetime.now(tz=daily_ema.index[-1].tzinfo)
-    if now.date() > last_daily_close.date():
+    latest_daily_date = daily_ema.index[-1].normalize()
+    if pd.Timestamp.now(tz="UTC").date() > latest_daily_date.date():
         current_ema10 = daily_ema.iloc[-1]
     else:
         current_ema10 = daily_ema.iloc[-2]
 
     df["ema10"] = current_ema10
+    df["prev_ema10"] = current_ema10
     df = compute_signals(df)
     latest = df.iloc[-1]
     latest_bar_start = latest.name.floor(timeframe_to_timedelta(timeframe))
