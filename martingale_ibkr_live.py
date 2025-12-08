@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
 
@@ -46,6 +46,7 @@ DATA_DIR = PROJECT_ROOT / "data"
 STATE_PATH = DATA_DIR / "martingale_live_state.json"
 TRADE_LOG_PATH = DATA_DIR / "trade_log_live.csv"
 TICKERS_FILE = PROJECT_ROOT / "tickers.txt"
+UTC = timezone.utc
 
 # Match IBKR-compliant durations used in the backtester
 DURATION_MAP = {
@@ -107,7 +108,7 @@ def get_equity(ib: IB) -> float:
 
 
 def fetch_intraday(ib: IB, contract: Stock, timeframe: str) -> pd.DataFrame:
-    end_dt = datetime.now()
+    end_dt = datetime.now(UTC)
     bars = ib.reqHistoricalData(
         contract,
         endDateTime=end_dt,
@@ -128,9 +129,10 @@ def fetch_intraday(ib: IB, contract: Stock, timeframe: str) -> pd.DataFrame:
 
 
 def get_daily_ema10(ib: IB, contract: Stock) -> pd.Series:
+    end_dt = datetime.now(UTC)
     bars = ib.reqHistoricalData(
         contract,
-        endDateTime="",
+        endDateTime=end_dt,
         durationStr="3 Y",
         barSizeSetting="1 day",
         whatToShow="MIDPOINT",
